@@ -7,7 +7,9 @@ import br.com.alura.exceptions.AgenciaNaoAtivaOuNaoEncontradaException;
 import br.com.alura.repository.AgenciaRepository;
 import br.com.alura.service.http.SituacaoCadastralHttpService;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.quarkus.logging.Log;
+import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -26,16 +28,24 @@ public class AgenciaService {
     @Inject
     private MeterRegistry meterRegistry;
 
-    public void cadastrar(Agencia agencia) {
-        AgenciaHttp agenciaHttp = situacaoCadastralHttpService.buscarPorCnpj(agencia.getCnpj());
-        if (agenciaHttp != null && agenciaHttp.getSituacaoCadastral().equals(SituacaoCadastral.ATIVO)) {
+    @WithTransaction
+    public Uni<Void> cadastrar(Agencia agencia) {
+
+        Uni<AgenciaHttp> agenciaHttp = situacaoCadastralHttpService.buscarPorCnpj(agencia.getCnpj());
+        return agenciaHttp
+                .onItem().ifNull().failWith(new AgenciaNaoAtivaOuNaoEncontradaException())
+                .onItem().transformToUni(item -> persistirSeAtiva(agencia, item));
+    }
+
+    private Uni<Void> persistirSeAtiva(Agencia agencia, AgenciaHttp agenciaHttp) {
+        if (agenciaHttp.getSituacaoCadastral().equals(SituacaoCadastral.ATIVO)) {
             Log.info("A agência com CNPJ " + agencia.getCnpj() + " foi cadastrada!");
             meterRegistry.counter("agencia_adicionada_counter").increment();
-            agenciaRepository.persist(agencia);
+            return agenciaRepository.persist(agencia).replaceWithVoid();
         } else {
             Log.error("A agência com CNPJ " + agencia.getCnpj() + " não está ativa ou não foi cadastrada.");
             meterRegistry.counter("agencia_nao_adicionada_counter").increment();
-            throw new AgenciaNaoAtivaOuNaoEncontradaException();
+            return Uni.createFrom().failure(new AgenciaNaoAtivaOuNaoEncontradaException());
         }
     }
 
