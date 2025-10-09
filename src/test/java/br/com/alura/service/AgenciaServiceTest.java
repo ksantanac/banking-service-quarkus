@@ -8,6 +8,8 @@ import br.com.alura.repository.AgenciaRepository;
 import br.com.alura.service.http.SituacaoCadastralHttpService;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
+import io.smallrye.mutiny.Uni;
+import io.vertx.core.Vertx;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.junit.jupiter.api.Assertions;
@@ -34,9 +36,12 @@ public class AgenciaServiceTest {
     public void naoDeveCadastrarQuandoClientRetornarNull() {
         Agencia agencia = criarAgencia();
 
-        Mockito.when(situacaoCadastralHttpService.buscarPorCnpj("123")).thenReturn(null);
+        Mockito.when(situacaoCadastralHttpService.buscarPorCnpj("123")).thenReturn(Uni.createFrom().nullItem());
 
-        Assertions.assertThrows(AgenciaNaoAtivaOuNaoEncontradaException.class, () -> agenciaService.cadastrar(agencia));
+        Vertx.vertx().runOnContext(r ->{
+            Assertions.assertThrows(AgenciaNaoAtivaOuNaoEncontradaException.class, () ->
+                    agenciaService.cadastrar(agencia).await().indefinitely());
+        });
 
         Mockito.verify(agenciaRepository, Mockito.never()).persist(agencia);
     }
@@ -47,7 +52,9 @@ public class AgenciaServiceTest {
 
         Mockito.when(situacaoCadastralHttpService.buscarPorCnpj("123")).thenReturn(criarAgenciaHttp());
 
-        agenciaService.cadastrar(agencia);
+        Vertx.vertx().runOnContext(r ->{
+            agenciaService.cadastrar(agencia).await().indefinitely();
+        });
 
         Mockito.verify(agenciaRepository).persist(agencia);
     }
@@ -65,15 +72,17 @@ public class AgenciaServiceTest {
 
     private Agencia criarAgencia() {
         Endereco endereco = new Endereco(1, "Rua teste", "Log teste", "Comp teste", 1);
-        return new Agencia(1, "Agencia Test", "Razao Agencia Teste", "123", endereco);
+        return new Agencia(1L, "Agencia Test", "Razao Agencia Teste", "123", endereco);
     }
 
-    private AgenciaHttp criarAgenciaHttp() {
-        return new AgenciaHttp("Agencia Teste", "Razao social da Agencia Teste", "123", ATIVO);
+    private Uni<AgenciaHttp> criarAgenciaHttp() {
+        return Uni.createFrom()
+                .item(new AgenciaHttp("Agencia Teste", "Razao social da Agencia Teste", "123", ATIVO)) ;
     }
 
-    private AgenciaHttp criarAgenciaHttpInativa() {
-        return new AgenciaHttp("Agencia Teste", "Razao social da Agencia Teste", "123", INATIVO);
+    private Uni<AgenciaHttp> criarAgenciaHttpInativa() {
+        return Uni.createFrom()
+                .item(new AgenciaHttp("Agencia Teste", "Razao social da Agencia Teste", "123", INATIVO)) ;
     }
 
 }
