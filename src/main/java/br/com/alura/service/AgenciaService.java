@@ -7,6 +7,7 @@ import br.com.alura.exceptions.AgenciaNaoAtivaOuNaoEncontradaException;
 import br.com.alura.repository.AgenciaRepository;
 import br.com.alura.service.http.SituacaoCadastralHttpService;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.quarkus.hibernate.reactive.panache.common.WithSession;
 import io.quarkus.hibernate.reactive.panache.common.WithTransaction;
 import io.quarkus.logging.Log;
 import io.smallrye.mutiny.Uni;
@@ -49,42 +50,29 @@ public class AgenciaService {
         }
     }
 
-    public Agencia buscarPorId(Long id) {
-        return agenciaRepository.findById(id);
-    }
+    @WithSession
+    public Uni<Agencia> buscarPorId(Long id) {return agenciaRepository.findById(id);}
 
-    public void deletar(Long id){
+    @WithSession
+    public Uni<Void> deletar(Long id){
         Log.info("A agência com ID " + id + " foi deletada!");
-        agenciaRepository.deleteById(id);
+        return agenciaRepository.deleteById(id).replaceWithVoid();
     }
 
-    public Agencia alterar(Agencia agencia){
-        Log.info("A agência com CNPJ " + agencia.getCnpj() + " foi alterada!");
+    @WithTransaction
+    public Uni<Agencia> alterar(Agencia agencia){
 
-        agenciaRepository.update(
+        return agenciaRepository.update(
                 "nome = ?1, razaoSocial = ?2, cnpj = ?3 where id = ?4",
                 agencia.getNome(),
                 agencia.getRazaoSocial(),
                 agencia.getCnpj(),
                 agencia.getId()
-        );
-
-        return agencia;
+            )
+                .onItem().transform(rows -> {
+                                Log.info("A agência com CNPJ " + agencia.getCnpj() + " foi alterada!");
+                                return agencia;
+                            });
     }
-
-
-//    public void alterar(Agencia agencia) {
-//        // Busca a entidade pelo ID
-//        Agencia entidadeExistente = agenciaRepository.findById(agencia.getId());
-//
-//        if (entidadeExistente != null) {
-//            // Atualiza os atributos desejados
-//            entidadeExistente.setNome(agencia.getNome());
-//            entidadeExistente.setRazaoSocial(agencia.getRazaoSocial());
-//            entidadeExistente.setCnpj(agencia.getCnpj());
-//        } else {
-//            throw new IllegalStateException("Agência com ID " + agencia.getId() + " não encontrada");
-//        }
-//    }
 
 }
