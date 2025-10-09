@@ -41,9 +41,9 @@ public class AgenciaServiceTest {
         Vertx.vertx().runOnContext(r ->{
             Assertions.assertThrows(AgenciaNaoAtivaOuNaoEncontradaException.class, () ->
                     agenciaService.cadastrar(agencia).await().indefinitely());
-        });
 
-        Mockito.verify(agenciaRepository, Mockito.never()).persist(agencia);
+            Mockito.verify(agenciaRepository, Mockito.never()).persist(agencia);
+        });
     }
 
     @Test
@@ -54,9 +54,9 @@ public class AgenciaServiceTest {
 
         Vertx.vertx().runOnContext(r ->{
             agenciaService.cadastrar(agencia).await().indefinitely();
-        });
 
-        Mockito.verify(agenciaRepository).persist(agencia);
+            Mockito.verify(agenciaRepository).persist(agencia);
+        });
     }
 
     @Test
@@ -65,9 +65,13 @@ public class AgenciaServiceTest {
 
         Mockito.when(situacaoCadastralHttpService.buscarPorCnpj("123")).thenReturn(criarAgenciaHttpInativa());
 
-        Assertions.assertThrows(AgenciaNaoAtivaOuNaoEncontradaException.class, () -> agenciaService.cadastrar(agencia));
+        Vertx.vertx().runOnContext(r ->{
 
-        Mockito.verify(agenciaRepository, Mockito.never()).persist(agencia);
+            Assertions.assertThrows(AgenciaNaoAtivaOuNaoEncontradaException.class, () ->
+                    agenciaService.cadastrar(agencia).await().indefinitely());
+
+            Mockito.verify(agenciaRepository, Mockito.never()).persist(agencia);
+        });
     }
 
     private Agencia criarAgencia() {
