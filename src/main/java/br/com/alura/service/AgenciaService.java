@@ -14,6 +14,8 @@ import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import org.eclipse.microprofile.faulttolerance.Fallback;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 @Slf4j
@@ -30,6 +32,14 @@ public class AgenciaService {
     private MeterRegistry meterRegistry;
 
     @WithTransaction
+    @CircuitBreaker(
+            // Conjunto de requisições com erro
+            requestVolumeThreshold = 5,
+            failureRatio = 0.5,
+            delay = 2000,
+            successThreshold = 2
+    )
+    @Fallback(fallbackMethod = "chamarFallback")
     public Uni<Void> cadastrar(Agencia agencia) {
 
         Uni<AgenciaHttp> agenciaHttp = situacaoCadastralHttpService.buscarPorCnpj(agencia.getCnpj());
@@ -48,6 +58,12 @@ public class AgenciaService {
             meterRegistry.counter("agencia_nao_adicionada_counter").increment();
             return Uni.createFrom().failure(new AgenciaNaoAtivaOuNaoEncontradaException());
         }
+    }
+
+    // METODO FALLBACK PRECISA RETORNAR O MESMO VALOR QUE O CADASTRAR (UNI VOID)
+    public Uni<Void> chamarFallback(Agencia agencia) {
+        Log.info("A agência com CNPJ " + agencia.getCnpj() + " não foi adicionado pois houve erro.");
+        return Uni.createFrom().nullItem();
     }
 
     @WithSession
